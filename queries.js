@@ -93,12 +93,14 @@ async function runQueries() {
         console.log(`Updated ${updateResult.modifiedCount} book(s)`);
         if (updateResult.modifiedCount > 0) {
             const updatedBook = await collection.findOne({ _id: bookId });
-            console.log(`Updated Book: ${updatedBook.title},  New Price: $${updatedBook.price}`);
+            console.log(
+                `Updated Book: ${updatedBook.title},  New Price: $${updatedBook.price}`
+            );
         }
 
         // Task 5: Delete a book by its title
-        async function deleteBookByTitle(title){
-            return collection.deleteOne({title:title})
+        async function deleteBookByTitle(title) {
+            return collection.deleteOne({ title: title });
         }
 
         const bookTitle = "To Kill a Mockingbird";
@@ -111,6 +113,89 @@ async function runQueries() {
         } else {
             console.log(`No book found with title "${bookTitle}".`);
         }
+
+        // ADVANCED QUERIES
+
+        // Task 1: Find books that are both in stock AND published after 2010.
+        async function findInStockBooksAfterYear(year) {
+            return collection
+                .find({ in_stock: true, published_year: { $gt: year } })
+                .toArray();
+        }
+        const stockYear = 2010;
+        const inStockRecentBooks = await findInStockBooksAfterYear(stockYear);
+        console.log(
+            `\nBooks in stock and published after ${stockYear}:`.toUpperCase()
+        );
+        if (inStockRecentBooks.length > 0) {
+            inStockRecentBooks.forEach((book, index) => {
+                console.log(
+                    `${index + 1}. ${book.title} by ${book.author} (${book.published_year
+                    })`
+                );
+            });
+            console.log(`\nTotal books found: ${inStockRecentBooks.length}`);
+        } else {
+            console.log(
+                `No books found that are in stock and published after ${stockYear}.`
+            );
+        }
+
+        // Task 2: Use projection (return only title, author, price).
+        async function findBooksProjection() {
+            return collection
+                .find({}, { projection: { title: 1, author: 1, price: 1, _id: 0 } })
+                .toArray();
+        }
+        const projectedBooks = await findBooksProjection();
+        console.log(
+            `\nBooks with projection (title, author, price):`.toUpperCase()
+        );
+        projectedBooks.forEach((book, index) => {
+            console.log(
+                `${index + 1}. ${book.title} by ${book.author} - $${book.price}`
+            );
+        });
+        console.log(`\nTotal books found: ${projectedBooks.length}`);
+
+        // Task 3:Implement sorting by price (ascending + descending).
+        async function findBooksSortedByPrice(order = "asc") {
+            const sortOrder = order === "asc" ? 1 : -1;
+            return collection.find({}).sort({ price: sortOrder }).toArray();
+        }
+        // ascending
+        const ascSortedBooks = await findBooksSortedByPrice("asc");
+        console.log(`\nBooks sorted by price (ascending):`.toUpperCase());
+        ascSortedBooks.forEach((book, index) => {
+            console.log(
+                `${index + 1}. ${book.title} by ${book.author} - $${book.price}`
+            );
+        });
+        // descending
+        const descSortedBooks = await findBooksSortedByPrice("desc");
+        console.log(`\nBooks sorted by price (descending):`.toUpperCase());
+        descSortedBooks.forEach((book, index) => {
+            console.log(
+                `${index + 1}. ${book.title} by ${book.author} - $${book.price}`
+            );
+        });
+
+        // Task 4: Implement pagination with .limit(5).skip(n)
+        async function findBooksWithPagination(page = 1, limit = 5) {
+            const skip = (page - 1) * limit;
+            return collection.find({}).limit(limit).skip(skip).toArray();
+        }
+
+        const page = 1;
+        const limit = 5;
+        const paginatedBooks = await findBooksWithPagination(page, limit);
+        console.log(`\nBooks - Page ${page} (limit ${limit}):`.toUpperCase());
+        paginatedBooks.forEach((book, index) => {
+            console.log(
+                `${index + 1}. ${book.title} by ${book.author} - $${book.price}`
+            );
+        });
+
 
     } catch (error) {
         console.error("Error occurred:", error);
