@@ -17,6 +17,7 @@ async function runQueries() {
         const db = client.db(dbName);
         const collection = db.collection(collectionName);
 
+        // BASIC CRUD OPERATIONS
         //Task 1: Find all books in a specific genre
         async function findBooksByGenre(genre) {
             return collection.find({ genre: genre }).toArray();
@@ -115,7 +116,6 @@ async function runQueries() {
         }
 
         // ADVANCED QUERIES
-
         // Task 1: Find books that are both in stock AND published after 2010.
         async function findInStockBooksAfterYear(year) {
             return collection
@@ -141,12 +141,11 @@ async function runQueries() {
             );
         }
 
-        // Task 2: Use projection (return only title, author, price).
+        // Task 2: Use projection to return only the title, author, and price fields in your queries
         async function findBooksProjection() {
-            return collection
-                .find({}, { projection: { title: 1, author: 1, price: 1, _id: 0 } })
-                .toArray();
+            return collection.find({}, { projection: { title: 1, author: 1, price: 1, _id: 0 } }).toArray();
         }
+
         const projectedBooks = await findBooksProjection();
         console.log(
             `\nBooks with projection (title, author, price):`.toUpperCase()
@@ -158,7 +157,7 @@ async function runQueries() {
         });
         console.log(`\nTotal books found: ${projectedBooks.length}`);
 
-        // Task 3:Implement sorting by price (ascending + descending).
+        // Task 3: Implement sorting by price (ascending + descending).
         async function findBooksSortedByPrice(order = "asc") {
             const sortOrder = order === "asc" ? 1 : -1;
             return collection.find({}).sort({ price: sortOrder }).toArray();
@@ -174,13 +173,14 @@ async function runQueries() {
         // descending
         const descSortedBooks = await findBooksSortedByPrice("desc");
         console.log(`\nBooks sorted by price (descending):`.toUpperCase());
+
         descSortedBooks.forEach((book, index) => {
             console.log(
                 `${index + 1}. ${book.title} by ${book.author} - $${book.price}`
             );
         });
 
-        // Task 4: Implement pagination with .limit(5).skip(n)
+        // Task 4: Use the limit and skip methods to implement pagination (5 books per page)
         async function findBooksWithPagination(page = 1, limit = 5) {
             const skip = (page - 1) * limit;
             return collection.find({}).limit(limit).skip(skip).toArray();
@@ -188,13 +188,99 @@ async function runQueries() {
 
         const page = 1;
         const limit = 5;
+
         const paginatedBooks = await findBooksWithPagination(page, limit);
         console.log(`\nBooks - Page ${page} (limit ${limit}):`.toUpperCase());
+
         paginatedBooks.forEach((book, index) => {
             console.log(
                 `${index + 1}. ${book.title} by ${book.author} - $${book.price}`
             );
         });
+
+        // AGGREGATION PIPELINE
+        // Task 1: Create an aggregation pipeline to calculate the average price of books by genre
+        async function averagePriceByGenre() {
+            return collection.aggregate([
+                { $group: { _id: "$genre", averagePrice: { $avg: "$price" } } },
+                { $sort: { averagePrice: -1 } }
+            ]).toArray();
+        }
+        const avgPriceResults = await averagePriceByGenre();
+        console.log(`\nAverage price of books by genre:`.toUpperCase());
+        avgPriceResults.forEach((result) => {
+            console.log(`Genre: ${result._id}, Average Price: $${result.averagePrice.toFixed(2)}`);
+        });
+
+        // Task 2: Create an aggregation pipeline to find the author with the most books in the collection
+        async function findAuthorWithMostBooks() {
+            return collection.aggregate([
+                {
+                    $group: {
+                        _id: "$author",
+                        totalBooks: { $sum: 1 }
+                    }
+                },
+                {
+                    $sort: {
+                        totalBooks: -1
+                    }
+                },
+                {
+                    $limit: 1
+                }
+            ]).toArray();
+        }
+
+        const topAuthor = await findAuthorWithMostBooks();
+        console.log(`\nAuthor with the most books: `.toUpperCase());
+
+        if (topAuthor.length > 0) {
+            console.log(
+                `${topAuthor[0]._id} with ${topAuthor[0].totalBooks} books`
+            );
+        } else {
+            console.log("No authors found");
+        }
+
+        // Task 3: Implement a pipeline that groups books by publication decade and counts them
+        async function groupBooksByDecade() {
+            return collection.aggregate([
+                {
+                    $addFields: {
+                        decade: {
+                            $multiply: [
+                                { $floor: { $divide: ["$published_year", 10] } },
+                                10
+                            ]
+                        }
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$decade",
+                        totalBooks: { $sum: 1 }
+                    }
+                },
+                { $sort: { _id: 1 } }
+            ]).toArray();
+        }
+
+        // INDEXING
+        // Task 1: Create an index on the title field for faster searches
+        await collection.createIndex({ title: 1 });
+        console.log("\nIndex created on 'title' field for faster searches.");
+
+        // Task 2: Create a compound index on author and published_year
+        await collection.createIndex({ author: 1, published_year: -1 });
+        console.log(
+            "Compound index created on 'author' and 'published_year' fields."
+        );
+
+        //Task 3: Use the explain() method to demonstrate the performance improvement with your indexes
+        const explainResult = await collection.find({ title: "1984" }).explain("executionStats");
+        console.log("\nExplain plan for query on title '1984':");
+        console.log(JSON.stringify(explainResult, null, 2));
 
 
     } catch (error) {
